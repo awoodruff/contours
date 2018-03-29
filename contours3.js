@@ -111,6 +111,8 @@ var color = d3.scaleLinear()
   .interpolate(d3.interpolateHcl);
 
 var color2 = d3.scaleLinear().domain([0, 180]).range(['#ffe083', '#0c6eb9']).interpolate(d3.interpolateHcl);
+var color3 = d3.scaleLinear().domain([0, 180]).range(['#ccc', '#333']);
+var color4 = d3.scaleLinear().domain([0, 180]).range(['#42f4b0', '#234da0']).interpolate(d3.interpolateHcl);
 
 function getRelief(){
   // reset canvases
@@ -151,7 +153,7 @@ function getRelief(){
   } else {
     interval = 50;
   }
-interval /= 8;
+//interval /= 4;
   if (map.getZoom() < 14) interval *= 2; // attempting to factor in zoom level
 //interval = 100;
   max = Math.ceil(max/interval) * interval;
@@ -270,6 +272,8 @@ function drawContours() {
       colors.push('rgb(' + [v,v,v].join(',') + ')')
     }
     color2.domain([0,numberOfShades-1])
+    color3.domain([0,numberOfShades-1])
+    color4.domain([0,numberOfShades-1])
     // light, medium, dark
 
     var slice = pi*2/slices;
@@ -296,7 +300,7 @@ function drawContours() {
     for (var pg = 0; pg < pathGroups.length; pg ++) {
       if (!pathGroups[pg]) continue;
       contourContext.beginPath();
-      contourContext.strokeStyle = color2(pg);//colors[pg];
+      contourContext.strokeStyle = color4(pg);//colors[pg];
       // if (pg == 2) contourContext.strokeStyle = 'black';
       // else if (pg == 1) contourContext.strokeStyle = '#666';
       // else contourContext.strokeStyle = '#ccc';
