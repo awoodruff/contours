@@ -45,6 +45,13 @@ var highlightColor = '#B1AEA4';
 var shadowColor = '#5b5143';
 var shadowSize = 2;
 
+var colorType = 'none';
+var solidColor = '#fffcfa';
+var hypsoColor = d3.scaleLinear()
+  .domain([0, 6000])
+  .range(["#486341", "#e5d9c9"])
+  .interpolate(d3.interpolateHcl);
+
 window.onresize = function () {
   width = mapNode.offsetWidth;
   height = mapNode.offsetHeight;
@@ -122,7 +129,50 @@ d3.select('#shadow-width').on('keyup', function () {
 });
 
 d3.select('#settings-toggle').on('click', function () {
-  d3.select('#settings').classed('show', !d3.select('#settings').classed('show'))
+  d3.select('#settings').classed('show', !d3.select('#settings').classed('show'));
+  d3.select('#download').classed('show', false);
+});
+
+d3.select('#download-toggle').on('click', function () {
+  d3.select('#download').classed('show', !d3.select('#download').classed('show'));
+  d3.select('#settings').classed('show', false);
+});
+
+d3.selectAll('input[name="bg"]').on('change', function () {
+  if (d3.select('#no-bg').node().checked) {
+    d3.select('#solid-style').classed('disabled', true);
+    d3.select('#hypso-style').classed('disabled', true);
+    colorType = 'none';
+  } else if (d3.select('#solid-bg').node().checked) {
+    d3.select('#solid-style').classed('disabled', false);
+    d3.select('#hypso-style').classed('disabled', true);
+    colorType = 'solid';
+  } else {
+    d3.select('#solid-style').classed('disabled', true);
+    d3.select('#hypso-style').classed('disabled', false);
+    colorType = 'hypso';
+  }
+  d3.selectAll('#solid-style input, #hypso-style input').attr('disabled', null);
+  d3.selectAll('.disabled input').attr('disabled', 'disabled');
+  drawContours();
+})
+
+d3.select('#solid-color').on('change', function () {
+  solidColor = this.value;
+  clearTimeout(wait);
+  wait = setTimeout(drawContours,500);
+});
+
+d3.select('#hypso-low-color').on('change', function () {
+  hypsoColor.range([this.value, hypsoColor.range()[1]]);
+  clearTimeout(wait);
+  wait = setTimeout(drawContours,500);
+});
+
+d3.select('#hypso-high-color').on('change', function () {
+  hypsoColor.range([hypsoColor.range()[0], this.value]);
+  clearTimeout(wait);
+  wait = setTimeout(drawContours,500);
 });
 
 var exampleLocations = [
@@ -194,11 +244,6 @@ function reverseTransform() {
   L.DomUtil.setPosition(contourCanvas, top_left);
 };
 
-var color = d3.scaleLinear()
-  .domain([0, 6000])
-  .range(["#a4ad9d", "#e5d9c9"])
-  .interpolate(d3.interpolateHcl);
-
 function getRelief(){
   // reset canvases
   demContext.clearRect(0,0,width,height);
@@ -228,7 +273,7 @@ function getContours () {
 
   max = d3.max(values);
   min = d3.min(values);
-   
+
   interval = +d3.select('#interval-input').node().value;
 
   max = Math.ceil(max/interval) * interval;
@@ -244,13 +289,13 @@ function getContours () {
 
   contoursGeoData = contour(values);
 
-  if (min < 0) {
+  //if (min < 0) {
     // include blue bathymetric colors if anything is below sea level
-    color.domain([min,-1,0,max]).range(['#12405e', '#a3c9e2', '#486341', '#e5d9c9'])
-  } else {
+   // hypsoColor.domain([min,-1,0,max]).range(['#12405e', '#a3c9e2', '#486341', '#e5d9c9'])
+  //} else {
     // otherwise just a green to tan range
-    color.domain([min,max]).range(["#486341", "#e5d9c9"])
-  }
+    hypsoColor.domain([min,max]);
+  //}
 
   d3.selectAll('#major option')
     .html(function () {
@@ -282,7 +327,10 @@ function drawContours() {
         contourContext.shadowColor = shadowColor;
         contourContext.strokeStyle = highlightColor;
       }
-      contourContext.fillStyle = color(c.value);
+      if (colorType == 'hypso')
+        contourContext.fillStyle = hypsoColor(c.value);
+      else if (colorType == 'solid') contourContext.fillStyle = solidColor;
+      else contourContext.fillStyle = '#fff';
       path(c);
       // draw the light stroke first, then the fill with drop shadow
       // the effect is a light edge on side and dark on the other, giving the raised/illuminated contour appearance
@@ -292,11 +340,26 @@ function drawContours() {
   } else {
     contourContext.lineWidth = lineWidth;
     contourContext.strokeStyle = lineColor;
-    contourContext.beginPath();
-    contoursGeoData.forEach(function (c) {
-      if (majorInterval == 0 || c.value % majorInterval != 0) path(c);
-    });
-    contourContext.stroke();
+    if (colorType != 'hypso') {
+      contourContext.beginPath();
+      contoursGeoData.forEach(function (c) {
+        if (majorInterval == 0 || c.value % majorInterval != 0) path(c);
+      });
+      if (colorType == 'solid') {
+        contourContext.fillStyle = solidColor;
+        contourContext.fill();
+      }
+      contourContext.stroke();
+    } else {
+      contoursGeoData.forEach(function (c) {
+        contourContext.beginPath();
+        if (majorInterval == 0 || c.value % majorInterval != 0) path(c);
+        contourContext.fillStyle = hypsoColor(c.value);
+        contourContext.fill();
+        contourContext.stroke();
+      });
+    }
+    
     if (majorInterval != 0) {
       contourContext.lineWidth = lineWidthMajor;
       contourContext.beginPath();
@@ -313,7 +376,7 @@ function drawContours() {
 function toGeoJson () {
   var geojson = {type: 'FeatureCollection', features: []};
   contoursGeoData.forEach(function (c) {
-    var feature = {type:'Feature', properties:{elevation: c.value}, geometry: {type:'MultiLineString', coordinates:[]}};
+    var feature = {type:'Feature', properties:{elevation: c.value}, geometry: {type:c.type, coordinates:[]}};
     geojson.features.push(feature);
     c.coordinates.forEach(function (poly) {
       var polygon = [];

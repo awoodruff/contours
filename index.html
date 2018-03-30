@@ -18,6 +18,7 @@
       margin: 0;
       font-family: 'Roboto', sans-serif;
       font-size: 12px;
+      color: #111;
     }
     #wrapper {
       position: relative;
@@ -26,7 +27,7 @@
       width: 100%;
       height: 100%;
     }
-    #settings {
+    #settings, #download {
       position: absolute;
       z-index: 1000;
       background-color: white;
@@ -35,15 +36,15 @@
       bottom: 20px;
       left: 50%;
       box-sizing: border-box;
-      width: 630px;
-      margin-left: -315px;
+      width: 700px;
+      margin-left: -350px;
       box-shadow: 0 0 10px rgba(0,0,0,.5);
       display: none;
     }
-    #settings.show {
+    #settings.show, #download.show {
       display: block;
     }
-    #settings-toggle {
+    #settings-toggle, #download-toggle {
       position: absolute;
       z-index: 1000;
       bottom: 20px;
@@ -53,21 +54,55 @@
       box-shadow: 0 0 10px rgba(0,0,0,.5);
       padding: 10px;
       cursor: pointer;
+      width: 50px;
+      height: 50px;
+      background-position: center center;
+      background-repeat: no-repeat;
+      background-size: 90%;
+    }
+    #settings-toggle:hover, #download-toggle:hover {
+      box-shadow: 0 0 10px rgba(0,0,0,1);
+    }
+    #download-toggle {
+      left: auto;
+      right: 20px;
+      background-image: url(download.png);
+    }
+    #settings-toggle {
+      background-image: url(palette.png);
     }
     .settings-title {
-      display: inline-block;
-      margin: 0 20px 0 0;
+      margin: 0 0 10px 0;
       font-size: 1.5rem;
       color: #666;
-      line-height: 40px;
       vertical-align: middle;
     }
     .settings-row {
-      margin: 10px 0;
-      height: 40px;
+      margin-bottom: 25px;
     }
     .settings-section {
       margin-right: 15px;
+    }
+    input[type="radio"] {
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    input[type="radio"] + span{
+      color: #999;
+      cursor: pointer;
+      border: 1px solid transparent;
+      padding: 5px;
+      border-radius: 5px;
+    }
+    input[type="radio"] + span:hover{
+      background-color: #f7f7f7;
+    }
+    input[type="radio"]:checked + span{
+      color: #111;
+      font-weight: bold;
+      display: inline-block;
+      border-color: #999;
+      background-color: #f7f7f7;
     }
     #settings input[type="text"] {
       width: 40px;
@@ -84,6 +119,23 @@
     .settings-row div {
       display: inline-block;
     }
+
+    #solid-style, #hypso-style {
+      margin-left: 10px;
+    }
+
+    div.disabled {
+      opacity: .1;
+    }
+
+    .download-button {
+      float: left;
+      width: 20px;
+      height: 20px;
+      background: url(download.png) center/contain no-repeat;
+      margin-right: 10px;
+      cursor: pointer; 
+    }
   </style>
 </head>
 
@@ -92,19 +144,19 @@
     <div id='map'></div>
     <div id='settings'>
       <div class='settings-row type'>
-        <p class="settings-title">Type</p>
-        <div class="settings-section"><label><input type="radio" name="type" value="lines"/> Contour lines</label></div>
-        <div class="settings-section"><label><input type="radio" name="type" checked value="illuminated"/> Illuminated contour polygons</label></div>
+        <p class="settings-title">Map Type</p>
+        <div class="settings-section"><label><input type="radio" name="type" checked value="lines"/><span>Contour lines</span></label></div>
+        <div class="settings-section"><label><input type="radio" name="type" value="illuminated"/><span>Illuminated contour polygons</span></label></div>
       </div>
       <div class='settings-row unit'>
-        <p class="settings-title">Interval</p>
+        <p class="settings-title">Contour Interval</p>
         <div class="settings-section">
           <input type="text" value="500" id="interval-input"/>
-          <label><input type="radio" name="unit" value="m"/> Meters</label>
-          <label><input type="radio" name="unit" checked value="ft"/> Feet</label>
+          <label><input type="radio" name="unit" value="m"/><span>m</span></label>
+          <label><input type="radio" name="unit" checked value="ft"/><span>ft</span></label>
         </div>
         <div class="settings-section">
-          <label>Major line interval: </label>
+          <label>Major interval: </label>
           <select id="major">
             <option value="0">None</option>
             <option value="2"></option>
@@ -114,11 +166,11 @@
         </div>
       </div>
       <div class='settings-row'>
-        <p class="settings-title">Style</p>
+        <p class="settings-title">Contour Style</p>
         <div id="lines-style">
           <div class="settings-section"><label>Contour color: <input id="line-color" type="color" value ="#8c7556"/></label></div>
           <div class="settings-section"><label>Line weight: <input id="line-width" type="text" value="0.75"/></label> pixels</div>
-          <div class="settings-section"><label>Major interval line weight: <input id="line-width-major" type="text" value="1.5"/></label> pixels</div>
+          <div class="settings-section"><label>Major line weight: <input id="line-width-major" type="text" value="1.5"/></label> pixels</div>
         </div>
         <div id="illuminated-style" style="display: none">
           <div class="settings-section"><label>Highlight color: <input id="highlight-color" type="color" value ="#B1AEA4"/></label></div>
@@ -126,8 +178,39 @@
           <div class="settings-section"><label>Width: <input id="shadow-width" type="text" value="2"/></label> pixels</div>
         </div>
       </div>
+      <div class='settings-row'>
+        <p class="settings-title">Background style</p>
+        <label><input type="radio" name="bg" checked value="none" id="no-bg"/><span>None</span></label>
+        <label><input type="radio" name="bg" value="solid" id="solid-bg"/><span>Solid color</span></label>
+        <div id="solid-style" class="disabled">
+          <input id="solid-color" type="color" value ="#fffcfa"/></label>
+        </div>
+        <label><input type="radio" name="bg" value="hypso"/><span>Hypsometric tints</span></label>
+        <div id="hypso-style" class="disabled">
+          <div class="settings-section"><label>Low color: <input id="hypso-low-color" type="color" value ="#486341"/></label></div>
+          <div class="settings-section"><label>High color: <input id="hypso-high-color" type="color" value ="#e5d9c9"/></label></div>
+        </div>
+      </div>
     </div>
-    <div id="settings-toggle">settings</div>
+    <div id="download">
+      <div class='settings-row'>
+        <div id="download-geojson" class="download-button"></div>
+        <p class="settings-title">GeoJSON</p>
+        Download contours for use in GIS or mapping applications. Contours will be exported as overlapping <code>MultiPolygon</code> features, each with an <code>elevation</code> property. <em>This will save geodata only. Styles will not be included!</em>
+      </div>
+      <div class='settings-row'>
+        <div id="download-png" class="download-button"></div>
+        <p class="settings-title">PNG image</p>
+        Download a raster image of the map, including your chosen styles.
+      </div>
+      <div class='settings-row'>
+        <div id="download-svg" class="download-button"></div>
+        <p class="settings-title">SVG</p>
+        Download contours as vector graphics. 
+      </div>
+    </div>
+    <div id="settings-toggle" title="Edit style"></div>
+    <div id="download-toggle" title="Download map or data"></div>
   </div>
   <script src='contours.js'></script>
 </body>
