@@ -13,20 +13,20 @@ var contourContext = contourCanvas.getContext('2d');
 var demContext = demCanvas.getContext('2d');
 
 // not too big or this can get hella slow
-var width = window.innerWidth;
-var height = window.innerHeight;
+var mapNode = d3.select('#map').node();
+var width = mapNode.offsetWidth;
+var height = mapNode.offsetHeight;
 contourCanvas.width = width;
 contourCanvas.height = height;
 demCanvas.width = width;
 demCanvas.height = height;
-document.getElementById('map').style.width = width + 'px';
-document.getElementById('map').style.height = height + 'px';
 
 var path = d3.geoPath().context(contourContext);
 
 var min;
 var max;
 var interval;
+var majorInterval = 0;
 var thresholds;
 var contour = d3.contours()
     .size([width, height]);
@@ -34,6 +34,96 @@ var contoursGeoData;
 
 var wait;
 
+var type = 'lines';
+var unit = 'ft';
+
+var lineWidth = .75;
+var lineWidthMajor = 1.5;
+var lineColor = '#8c7556';
+
+var highlightColor = '#B1AEA4';
+var shadowColor = '#5b5143';
+var shadowSize = 2;
+
+window.onresize = function () {
+  width = mapNode.offsetWidth;
+  height = mapNode.offsetHeight;
+  contourCanvas.width = width;
+  contourCanvas.height = height;
+  demCanvas.width = width;
+  demCanvas.height = height;
+  contour.size([width, height]);
+  clearTimeout(wait);
+  wait = setTimeout(getRelief,500);
+}
+
+d3.selectAll('.settings-row.type input').on('change', function () {
+  type = d3.select('.settings-row.type input:checked').node().value;
+  d3.select('#major').attr('disabled', type =='illuminated' ? 'disabled' : null);
+  d3.select('#lines-style').style('display', type =='illuminated' ? 'none' : 'inline-block');
+  d3.select('#illuminated-style').style('display', type =='illuminated' ? 'inline-block' : 'none');
+  drawContours();
+});
+
+d3.select('#interval-input').on('keyup', function () {
+  if (+this.value == interval) return;
+  clearTimeout(wait);
+  wait = setTimeout(getContours,500);
+});
+
+d3.selectAll('input[name="unit"]').on('change', function () {
+  if (this.checked) unit = this.value;
+  getContours();
+})
+
+d3.select('#major').on('change', function () {
+  majorInterval = +this.value * interval;
+  d3.select('#line-width-major').attr('disabled', majorInterval == 0 ? 'disabled' : null)
+  drawContours();
+});
+
+d3.select('#line-width-major').on('keyup', function () {
+  if (isNaN(this.value) || +this.value < 0) this.value = 1.5;
+  lineWidthMajor = +this.value;
+  clearTimeout(wait);
+  wait = setTimeout(drawContours,500);
+});
+
+d3.select('#line-width').on('keyup', function () {
+  if (isNaN(this.value) || +this.value < 0) this.value = .75;
+  lineWidth = +this.value;
+  clearTimeout(wait);
+  wait = setTimeout(drawContours,500);
+});
+
+d3.select('#line-color').on('change', function () {
+  lineColor = this.value;
+  clearTimeout(wait);
+  wait = setTimeout(drawContours,500);
+});
+
+d3.select('#highlight-color').on('change', function () {
+  highlightColor = this.value;
+  clearTimeout(wait);
+  wait = setTimeout(drawContours,500);
+});
+
+d3.select('#shadow-color').on('change', function () {
+  shadowColor = this.value;
+  clearTimeout(wait);
+  wait = setTimeout(drawContours,500);
+});
+
+d3.select('#shadow-width').on('keyup', function () {
+  if (isNaN(this.value) || +this.value < 0) this.value = 2;
+  shadowSize = +this.value;
+  clearTimeout(wait);
+  wait = setTimeout(drawContours,500);
+});
+
+d3.select('#settings-toggle').on('click', function () {
+  d3.select('#settings').classed('show', !d3.select('#settings').classed('show'))
+});
 
 var exampleLocations = [
   {name: 'Mount Fuji', coords: [35.3577, 138.7331, 13]},
@@ -52,11 +142,9 @@ if (url_hash.length == 3) {
     map_start_location = map_start_location.map(Number);
 }
 
-var map = L.map('map',{scrollWheelZoom: false, zoomControl: false});
+var map = L.map('map',{scrollWheelZoom: false});
 var hash = new L.Hash(map);
 map.setView(map_start_location.slice(0, 3), map_start_location[2]);
-
-L.control.zoom({position:'bottomright'}).addTo(map);
 
 map.on('moveend', function() {
   // on move end we redraw the flow layer, so clear some stuff
@@ -95,6 +183,11 @@ var demLayer = new CanvasLayer({attribution: '<a href="https://aws.amazon.com/pu
 var pane = map.createPane('contour');
 pane.appendChild(contourCanvas);
 
+// custom map pane for the contours, above other layers
+var labelPane = map.createPane('labels');
+var referenceLayer = L.tileLayer('https://stamen-tiles.a.ssl.fastly.net/toner-hybrid/{z}/{x}/{y}.png', {pane:'labels', attribution:'Map tiles by <a href="http://stamen.com">Stamen Design</a>, under <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a>. Data by <a href="http://openstreetmap.org">OpenStreetMap</a>, under <a href="http://www.openstreetmap.org/copyright">ODbL</a>.'}).addTo(map);
+
+
 // this resets our canvas back to top left of the window after panning the map
 function reverseTransform() {
   var top_left = map.containerPointToLayerPoint([0, 0]);
@@ -108,7 +201,6 @@ var color = d3.scaleLinear()
 
 function getRelief(){
   // reset canvases
-  contourContext.clearRect(0,0,width,height);
   demContext.clearRect(0,0,width,height);
   reverseTransform();
 
@@ -120,33 +212,24 @@ function getRelief(){
   demImageData = demContext.getImageData(0,0,width,height);
   demData = demImageData.data;
 
+  getContours();
+}
+
+function getContours () {
   var values = new Array(width*height);
   // get elevation values for pixels
   for (var y=0; y < height; y++) {
     for (var x=0; x < width; x++) {
       var i = getIndexForCoordinates(width, x,y);
       // x + y*width is the array position expected by the contours generator
-      values[x + y*width] = Math.round(elev(i, demData) * 3.28084); // converting meters to feet here. #USA!!!1
+      values[x + y*width] = Math.round(elev(i, demData) * (unit == 'ft' ? 3.28084 : 1)); // converting meters to feet here. #USA!!!1
     }
   }
 
   max = d3.max(values);
   min = d3.min(values);
-
-  contour.thresholds(20); // sets a contour interval so that there are approximately 20 steps between min and max
-
-  // alternatively, try to set a contour interval based on elevation range and zoom level
-  
-  /*
-  if (max - min > 7500) {
-    interval = 500;
-  } else if (max - min > 3000) {
-    interval = 100;
-  } else {
-    interval = 50;
-  }
-
-  if (map.getZoom() < 14) interval *= 2; // attempting to factor in zoom level
+   
+  interval = +d3.select('#interval-input').node().value;
 
   max = Math.ceil(max/interval) * interval;
   min = Math.floor(min/interval) * interval;
@@ -157,7 +240,7 @@ function getRelief(){
     thresholds.push(i);
   }
   contour.thresholds(thresholds);
-  */
+  
 
   contoursGeoData = contour(values);
 
@@ -169,41 +252,84 @@ function getRelief(){
     color.domain([min,max]).range(["#486341", "#e5d9c9"])
   }
 
+  d3.selectAll('#major option')
+    .html(function () {
+      if (+this.value == 0) return 'None';
+      return +this.value * interval;
+    });
+
+  majorInterval = +d3.select('#major').node().value * interval;
+
   drawContours();
 }
 
 function drawContours() {
-  contourContext.lineWidth = 3;
-  contourContext.shadowBlur = 2;
-  contourContext.shadowOffsetX = 2;
-  contourContext.shadowOffsetY = 2;
+  contourContext.clearRect(0,0,width,height);
+  contourContext.save();
+  if (type == 'illuminated') {
+    contourContext.lineWidth = shadowSize + 1;
+    contourContext.shadowBlur = shadowSize;
+    contourContext.shadowOffsetX = shadowSize;
+    contourContext.shadowOffsetY = shadowSize;
 
-  if (map.getZoom() < 8) {
-    contourContext.lineWidth = 1;
-    contourContext.shadowBlur = 1;
-    contourContext.shadowOffsetX = 1;
-    contourContext.shadowOffsetY = 1;
-  }
-
-  contoursGeoData.forEach(function (c) {
+    contoursGeoData.forEach(function (c) {
+      contourContext.beginPath();
+      if (c.value < 0) {
+        // blue-ish shadow and highlight colors below sea level
+        contourContext.shadowColor = '#4e5c66';
+        contourContext.strokeStyle = 'rgba(224, 242, 255, .25)';
+      } else {
+        contourContext.shadowColor = shadowColor;
+        contourContext.strokeStyle = highlightColor;
+      }
+      contourContext.fillStyle = color(c.value);
+      path(c);
+      // draw the light stroke first, then the fill with drop shadow
+      // the effect is a light edge on side and dark on the other, giving the raised/illuminated contour appearance
+      contourContext.stroke(); 
+      contourContext.fill();
+    });
+  } else {
+    contourContext.lineWidth = lineWidth;
+    contourContext.strokeStyle = lineColor;
     contourContext.beginPath();
-    if (c.value < 0) {
-      // blue-ish shadow and highlight colors below sea level
-      contourContext.shadowColor = '#4e5c66';
-      contourContext.strokeStyle = 'rgba(224, 242, 255, .25)';
-    } else {
-      contourContext.shadowColor = '#5b5143';
-      contourContext.strokeStyle = 'rgba(255, 250, 234,.25)';
+    contoursGeoData.forEach(function (c) {
+      if (majorInterval == 0 || c.value % majorInterval != 0) path(c);
+    });
+    contourContext.stroke();
+    if (majorInterval != 0) {
+      contourContext.lineWidth = lineWidthMajor;
+      contourContext.beginPath();
+      contoursGeoData.forEach(function (c) {
+        if (c.value % majorInterval == 0) path(c);
+      });
+      contourContext.stroke();
     }
-    contourContext.fillStyle = color(c.value);
-    path(c);
-    // draw the light stroke first, then the fill with drop shadow
-    // the effect is a light edge on side and dark on the other, giving the raised/illuminated contour appearance
-    contourContext.stroke(); 
-    contourContext.fill();
-  });
+
+  }
+  contourContext.restore();
 }
 
+function toGeoJson () {
+  var geojson = {type: 'FeatureCollection', features: []};
+  contoursGeoData.forEach(function (c) {
+    var feature = {type:'Feature', properties:{elevation: c.value}, geometry: {type:'MultiLineString', coordinates:[]}};
+    geojson.features.push(feature);
+    c.coordinates.forEach(function (poly) {
+      var polygon = [];
+      feature.geometry.coordinates.push(polygon);
+      poly.forEach(function (ring) {
+        var polyRing = [];
+        polygon.push(polyRing);
+        ring.forEach(function (coord) {
+          var ll = map.containerPointToLatLng(coord);
+          polyRing.push([ll.lng, ll.lat]);
+        });
+      });
+    })
+  });
+  console.log(JSON.stringify(geojson));
+}
 
 // convert elevation tile color to elevation value
 function elev(index, demData) {

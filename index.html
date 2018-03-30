@@ -17,20 +17,117 @@
     html, body { 
       margin: 0;
       font-family: 'Roboto', sans-serif;
-      font-size: 16px;
+      font-size: 12px;
     }
     #wrapper {
       position: relative;
     }
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+    #settings {
+      position: absolute;
+      z-index: 1000;
+      background-color: white;
+      border-radius: 5px;
+      padding: 20px;
+      bottom: 20px;
+      left: 50%;
+      box-sizing: border-box;
+      width: 630px;
+      margin-left: -315px;
+      box-shadow: 0 0 10px rgba(0,0,0,.5);
+      display: none;
+    }
+    #settings.show {
+      display: block;
+    }
+    #settings-toggle {
+      position: absolute;
+      z-index: 1000;
+      bottom: 20px;
+      left: 20px;
+      background-color: white;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0,0,0,.5);
+      padding: 10px;
+      cursor: pointer;
+    }
+    .settings-title {
+      display: inline-block;
+      margin: 0 20px 0 0;
+      font-size: 1.5rem;
+      color: #666;
+      line-height: 40px;
+      vertical-align: middle;
+    }
+    .settings-row {
+      margin: 10px 0;
+      height: 40px;
+    }
+    .settings-section {
+      margin-right: 15px;
+    }
+    #settings input[type="text"] {
+      width: 40px;
+      font-size: 12px;
+      padding: 5px;
+      text-align: center;
+    }
+    #settings input#interval-input {
+      width: 50px;
+    }
     canvas {position: absolute; top:0; left:0;}
-    .leaflet-container{ background: black;}
+    .leaflet-container{ background: white;}
+
+    .settings-row div {
+      display: inline-block;
+    }
   </style>
 </head>
 
 <body>
   <div id='wrapper'>
-    <div id='map' style='width:800px;height:530px;'></div>
-    
+    <div id='map'></div>
+    <div id='settings'>
+      <div class='settings-row type'>
+        <p class="settings-title">Type</p>
+        <div class="settings-section"><label><input type="radio" name="type" value="lines"/> Contour lines</label></div>
+        <div class="settings-section"><label><input type="radio" name="type" checked value="illuminated"/> Illuminated contour polygons</label></div>
+      </div>
+      <div class='settings-row unit'>
+        <p class="settings-title">Interval</p>
+        <div class="settings-section">
+          <input type="text" value="500" id="interval-input"/>
+          <label><input type="radio" name="unit" value="m"/> Meters</label>
+          <label><input type="radio" name="unit" checked value="ft"/> Feet</label>
+        </div>
+        <div class="settings-section">
+          <label>Major line interval: </label>
+          <select id="major">
+            <option value="0">None</option>
+            <option value="2"></option>
+            <option value="5"></option>
+            <option value="10"></option>
+          </select>
+        </div>
+      </div>
+      <div class='settings-row'>
+        <p class="settings-title">Style</p>
+        <div id="lines-style">
+          <div class="settings-section"><label>Contour color: <input id="line-color" type="color" value ="#8c7556"/></label></div>
+          <div class="settings-section"><label>Line weight: <input id="line-width" type="text" value="0.75"/></label> pixels</div>
+          <div class="settings-section"><label>Major interval line weight: <input id="line-width-major" type="text" value="1.5"/></label> pixels</div>
+        </div>
+        <div id="illuminated-style" style="display: none">
+          <div class="settings-section"><label>Highlight color: <input id="highlight-color" type="color" value ="#B1AEA4"/></label></div>
+          <div class="settings-section"><label>Shadow color: <input id="shadow-color" type="color" value ="#5b5143"/></label></div>
+          <div class="settings-section"><label>Width: <input id="shadow-width" type="text" value="2"/></label> pixels</div>
+        </div>
+      </div>
+    </div>
+    <div id="settings-toggle">settings</div>
   </div>
   <script src='contours.js'></script>
 </body>
