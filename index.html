@@ -77,6 +77,9 @@
       color: #666;
       vertical-align: middle;
     }
+    #download .settings-title {
+      cursor: pointer;
+    }
     .settings-row {
       margin-bottom: 25px;
     }
@@ -136,6 +139,10 @@
       margin-right: 10px;
       cursor: pointer; 
     }
+
+    #download em {
+      color: #d85656;
+    }
   </style>
 </head>
 
@@ -193,20 +200,20 @@
       </div>
     </div>
     <div id="download">
-      <div class='settings-row'>
+      <div class='settings-row geojson'>
         <div id="download-geojson" class="download-button"></div>
         <p class="settings-title">GeoJSON</p>
         Download contours for use in GIS or mapping applications. Contours will be exported as overlapping <code>MultiPolygon</code> features, each with an <code>elevation</code> property. <em>This will save geodata only. Styles will not be included!</em>
       </div>
-      <div class='settings-row'>
+      <div class='settings-row png'>
         <div id="download-png" class="download-button"></div>
         <p class="settings-title">PNG image</p>
         Download a raster image of the map, including your chosen styles.
       </div>
-      <div class='settings-row'>
+      <div class='settings-row svg'>
         <div id="download-svg" class="download-button"></div>
         <p class="settings-title">SVG</p>
-        Download contours as vector graphics. 
+        Download contours as vector graphics. <em>This does not work for illuminated contours! It will export polygons, but you'll have better luck achieving the effect in your favorite graphics editing software.</em>
       </div>
     </div>
     <div id="settings-toggle" title="Edit style"></div>
