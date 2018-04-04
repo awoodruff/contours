@@ -172,18 +172,21 @@ function getRelief(){
   drawContours();
 }
 
+var angle = Math.PI / 4;
+var r = 2;
+
 function drawContours() {
+  contourContext.clearRect(0,0,width,height);
   contourContext.lineWidth = 3;
-  contourContext.shadowBlur = 2;
-  contourContext.shadowOffsetX = 2;
-  contourContext.shadowOffsetY = 2;
+  r = 3;
 
   if (map.getZoom() < 8) {
     contourContext.lineWidth = 1;
-    contourContext.shadowBlur = 1;
-    contourContext.shadowOffsetX = 1;
-    contourContext.shadowOffsetY = 1;
+    r = 1;
   }
+  contourContext.shadowBlur = r;
+  contourContext.shadowOffsetX = r * Math.cos(angle)
+  contourContext.shadowOffsetY = r * Math.sin(angle)
 
   contoursGeoData.forEach(function (c) {
     contourContext.beginPath();
@@ -202,6 +205,27 @@ function drawContours() {
     contourContext.stroke(); 
     contourContext.fill();
   });
+}
+
+var playing;
+function play () {
+  playing = true;
+  requestAnimationFrame(animate);
+}
+function animate () {
+  angle += Math.PI/16;
+  drawContours();
+  if (playing) requestAnimationFrame(animate);
+}
+function stop() {
+  playing = false;
+}
+
+function polarToCartesian (r, theta) {
+  return {
+      x: r * Math.cos(theta),
+      y: r * Math.sin(theta)
+  }
 }
 
 
