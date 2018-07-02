@@ -1,3 +1,15 @@
+var forcedInterval = 50;
+var intervalMutliplier = 1;
+var pathSpacing = 2;
+var pathSegmentLength = 3;
+var maxSegments = 100;
+var numberOfShades = 5;
+var lineWidth = 1;
+var alpha = .02;
+var pathColorScale;
+
+var slices = 2 * (numberOfShades - 1);
+
 // canvas on which all the flowing lines will be drawn, and some convenience variables
 var contourCanvas = document.createElement('canvas');
 contourCanvas.id='contours';
@@ -113,6 +125,9 @@ var color = d3.scaleLinear()
 var color2 = d3.scaleLinear().domain([0, 180]).range(['#ffe083', '#0c6eb9']).interpolate(d3.interpolateHcl);
 var color3 = d3.scaleLinear().domain([0, 180]).range(['#ccc', '#333']);
 var color4 = d3.scaleLinear().domain([0, 180]).range(['#42f4b0', '#234da0']).interpolate(d3.interpolateHcl);
+var color5 = d3.scaleLinear().domain([0, 180]).range(['#ffe083', '#5b81ff']).interpolate(d3.interpolateHcl);
+var color6 = d3.scaleLinear().domain([0, 180]).range(['#ff6083', '#5b81ff']).interpolate(d3.interpolateHcl);
+pathColorScale = color5;
 
 function getRelief(){
   // reset canvases
@@ -142,9 +157,6 @@ function getRelief(){
   min = 0;//d3.min(values);
 
   //contour.thresholds(20); // sets a contour interval so that there are approximately 20 steps between min and max
-
-  // alternatively, try to set a contour interval based on elevation range and zoom level
-  
   
   if (max - min > 7500) {
     interval = 500;
@@ -154,8 +166,13 @@ function getRelief(){
     interval = 50;
   }
 //interval /= 4;
-  if (map.getZoom() < 14) interval *= 2; // attempting to factor in zoom level
+  //if (map.getZoom() < 14) interval *= 2; // attempting to factor in zoom level
 //interval = 100;
+  interval *= intervalMutliplier;
+
+  // alternatively, try to set a contour interval based on elevation range and zoom level
+  if (forcedInterval) interval = forcedInterval;
+
   max = Math.ceil(max/interval) * interval;
   min = Math.floor(min/interval) * interval;
 
@@ -194,6 +211,16 @@ var halfpi = Math.PI/2;
 function drawContours() {
   contourContext.clearRect(0,0,width,height);
   svg.selectAll('path').remove();
+
+  // var zero = contoursGeoData.filter(function (c){ return c.value === 0});
+  // if (zero.length) {
+  //   contourContext.fillStyle = '#000020';
+  //   contourContext.fillRect(0,0,width,height);
+  //   contourContext.beginPath();
+  //   contourContext.fillStyle = 'black';
+  //   path(zero[0]);
+  //   contourContext.fill();
+  // }
   
   // contourContext.shadowBlur = r;
   // contourContext.shadowOffsetX = r * Math.cos(angle)
@@ -209,6 +236,7 @@ function drawContours() {
 
   
   contourContext.lineWidth = 0.5;
+  contourContext.globalAlpha = alpha;
 
   // contourContext.beginPath();
   // contourContext.strokeStyle = 'red';
@@ -216,12 +244,75 @@ function drawContours() {
   // path(contoursGeoData[13]);
   // contourContext.stroke();
 
-  var line = d3.line().context(contourContext).curve(d3.curveBundle.beta(.5))
+  var line = d3.line().context(contourContext).curve(d3.curveBundle.beta(.5));
 
+  // paths from random points
 
+  // var paths = [];
+  // for (var count = 0; count < 100000; count ++) {
+  //   var x = Math.round(Math.random() * (width - 10)) + 5;
+  //   var y = Math.round(Math.random() * (height - 10)) + 5;
+  //   var p = getPath([x,y], 1000, 1000);
+  //   if (p) paths.push(p);
+  // }
+
+  // var pathGroups = new Array(numberOfShades);
+  // var colors = [];
+  // for (var a = 0; a < numberOfShades; a ++) {
+  //   pathGroups[a] = [];
+  //   // var v = 204 - a * (204/(numberOfShades-1));
+  //   // colors.push('rgb(' + [v,v + 15,v + 45].join(',') + ')')
+  //   var v = 180 - a * (180/(numberOfShades-1));
+  //   colors.push('rgb(' + [v,v,v].join(',') + ')')
+  // }
+  // pathColorScale.domain([0,numberOfShades-1])
+  // // light, medium, dark
+
+  // var slice = pi*2/slices;
+  // var minLightAngle = 1.75 * pi - (slice/2);
+ 
+  // var delta;
+  // var slicesAway;
+  // paths.forEach(function (p) {
+  //   if (p.aspect < 0) p.aspect += pi*2;
+  //   delta = p.aspect - minLightAngle;
+  //   if (delta < 0 ) delta += 2*pi;
+  //   slicesAway = Math.ceil(delta/slice);
+  //   if (slicesAway > numberOfShades) slicesAway = 2 * numberOfShades - slicesAway;
+  //   slicesAway--;
+  //  // console.log(slicesAway)
+  //   pathGroups[slicesAway].push(p);
+  //   // if (p.aspect > 1.5 * pi) pathGroups[0].push(p);
+  //   // else if (p.aspect > halfpi && p.aspect < pi) pathGroups[2].push(p);
+  //   // else pathGroups[1].push(p);
+  // });
+
+  // //console.log(pathGroups)
+
+  // for (var pg = 0; pg < pathGroups.length; pg ++) {
+  //   if (!pathGroups[pg]) continue;
+  //   contourContext.beginPath();
+  //   contourContext.strokeStyle = pathColorScale(pg);//colors[pg];
+  //   // if (pg == 2) contourContext.strokeStyle = 'black';
+  //   // else if (pg == 1) contourContext.strokeStyle = '#666';
+  //   // else contourContext.strokeStyle = '#ccc';
+  //   // if (pg == 2) contourContext.strokeStyle = 'black';
+  //   // else if (pg == 1) contourContext.strokeStyle = 'red';
+  //   // else contourContext.strokeStyle = 'blue';
+  //   contourContext.lineWidth = lineWidth// + pg / numberOfShades;
+  //   pathGroups[pg].forEach(function (p) {
+  //     line(p.coords);
+  //   })
+  //   contourContext.stroke();
+  // }
+
+  // paths from contours
+  
   for (var j = contoursGeoData.length-1; j > 0; j--) {
    // continue;
     var c = contoursGeoData[j];
+      // if (c.value > 0) continue;
+
    // if (c.value !=5000) continue;
     var paths = [];
 
@@ -234,7 +325,8 @@ function drawContours() {
           .attr('d', pathsvg);
         var length = d3Path.node().getTotalLength();
         var ringCoords = [];
-        for (var pt = 0; pt < length; pt += 6) {
+        var spacing = c.value > 0 ? pathSpacing : Math.max(1,parseInt(pathSpacing/2));
+        for (var pt = 0; pt < length; pt += spacing) {
           var coord = d3Path.node().getPointAtLength(pt);
           ringCoords.push([coord.x,coord.y])  
         }
@@ -249,7 +341,9 @@ function drawContours() {
 
           // contourContext.moveTo(ring[i][0], ring[i][1]);
           // contourContext.lineTo(ring[i][0] + p.x, ring[i][1] + p.y)
-          var p = getPath(ringCoords[i], (c.value - interval)/3.28084, c.value);
+          var p;
+          if (c.value > 0 ) p = getPath(ringCoords[i], (c.value - interval)/3.28084, c.value);
+          else p = getPathUp(ringCoords[i], (c.value + interval)/3.28084, c.value);
           if (p) paths.push(p);
 
           
@@ -259,8 +353,7 @@ function drawContours() {
 
    // continue;
 
-   var numberOfShades = 5;
-   var slices = 2 * (numberOfShades - 1);
+
 
     var pathGroups = new Array(numberOfShades);
     var colors = [];
@@ -271,9 +364,7 @@ function drawContours() {
       var v = 180 - a * (180/(numberOfShades-1));
       colors.push('rgb(' + [v,v,v].join(',') + ')')
     }
-    color2.domain([0,numberOfShades-1])
-    color3.domain([0,numberOfShades-1])
-    color4.domain([0,numberOfShades-1])
+    pathColorScale.domain([0,numberOfShades-1])
     // light, medium, dark
 
     var slice = pi*2/slices;
@@ -300,14 +391,14 @@ function drawContours() {
     for (var pg = 0; pg < pathGroups.length; pg ++) {
       if (!pathGroups[pg]) continue;
       contourContext.beginPath();
-      contourContext.strokeStyle = color4(pg);//colors[pg];
+      contourContext.strokeStyle = pathColorScale(pg);//colors[pg];
       // if (pg == 2) contourContext.strokeStyle = 'black';
       // else if (pg == 1) contourContext.strokeStyle = '#666';
       // else contourContext.strokeStyle = '#ccc';
       // if (pg == 2) contourContext.strokeStyle = 'black';
       // else if (pg == 1) contourContext.strokeStyle = 'red';
       // else contourContext.strokeStyle = 'blue';
-      contourContext.lineWidth = .25// + pg / numberOfShades;
+      contourContext.lineWidth = lineWidth// + pg / numberOfShades;
       pathGroups[pg].forEach(function (p) {
         line(p.coords);
       })
@@ -343,7 +434,7 @@ function drawContours() {
   })
    
   
-
+  contourContext.globalAlpha = 1;
 
   
   
@@ -380,17 +471,54 @@ function getPath(coords, endEl, contour) {
   var i = 0;
   var avgAspect = 0;
   var next;
-  while (el > endEl) {
+  while (el >= endEl) {
     i++;
     index = getIndexForCoordinates(width, Math.round(path[path.length-1][0]), Math.round(path[path.length-1][1]));
     aspect = getAspect(path[path.length-1], index);
     el = elev(index, demData);
     if (isNaN(aspect) || aspect === undefined) break;
     if (isNaN(el) || !el) break;
-    if (i > 30) break;
+    if (i > maxSegments) break;
     avgAspect += aspect;
-    p = polarToCartesian(3, aspect - halfpi);
+    p = polarToCartesian(pathSegmentLength, aspect - halfpi);
     next = [Math.round(path[path.length-1][0] + p.x), Math.round(path[path.length-1][1] + p.y)];
+    if (next[0] < 0 || next[0] > width || next[1] < 0 || next[1] > height) break;
+   // if (!allPoints[next[0]] || !allPoints[next[0]][next[1]] || !allPoints[next[0]][next[1]].indexOf(contour) == -1) {
+      path.push(next);
+    //   if (!allPoints[next[0]]) allPoints[next[0]] = {};
+    //   if (!allPoints[next[0]][next[1]]) allPoints[next[0]][next[1]] = [];
+    //   allPoints[next[0]][next[1]].push(contour);
+    // } else {
+    //   break;
+    // }
+  }
+  if (path.length > 1) return {coords: path, aspect: avgAspect/i};
+}
+
+function getPathUp(coords, endEl, contour) {
+  var path = [coords];
+  var index;
+  var aspect;
+  var el = 0;
+  endEl = 50000;
+  var p;
+  var i = 0;
+  var avgAspect = 0;
+  var next;
+  index = getIndexForCoordinates(width, Math.round(path[path.length-1][0]), Math.round(path[path.length-1][1]));
+  aspect = getAspect(path[path.length-1], index);
+  var maxSegs = 3 - Math.round(Math.random());
+  while (el <= endEl && el >= contour) {
+    i++;
+    index = getIndexForCoordinates(width, Math.round(path[path.length-1][0]), Math.round(path[path.length-1][1]));
+    aspect = aspect + (.4 - .8 * Math.random());
+    el = elev(index, demData);
+    if (isNaN(aspect) || aspect === undefined) break;
+    if (isNaN(el) || !el) break;
+    if (i > maxSegs) break;
+    avgAspect += aspect;
+    p = polarToCartesian(5, aspect - halfpi);
+    next = [Math.round(path[path.length-1][0] - p.x), Math.round(path[path.length-1][1] - p.y)];
     if (next[0] < 0 || next[0] > width || next[1] < 0 || next[1] > height) break;
    // if (!allPoints[next[0]] || !allPoints[next[0]][next[1]] || !allPoints[next[0]][next[1]].indexOf(contour) == -1) {
       path.push(next);
