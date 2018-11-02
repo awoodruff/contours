@@ -1,11 +1,11 @@
-var forcedInterval = 50;
+var forcedInterval = 100;
 var intervalMutliplier = 1;
-var pathSpacing = 2;
-var pathSegmentLength = 3;
-var maxSegments = 100;
-var numberOfShades = 5;
+var pathSpacing = 3;
+var pathSegmentLength = 1;
+var maxSegments = 200;
+var numberOfShades = 4;
 var lineWidth = 1;
-var alpha = .02;
+var alpha = .1;
 var pathColorScale;
 
 var slices = 2 * (numberOfShades - 1);
