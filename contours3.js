@@ -1,12 +1,13 @@
-var forcedInterval = 100;
+var forcedInterval = 50;
 var intervalMutliplier = 1;
 var pathSpacing = 3;
-var pathSegmentLength = 1;
-var maxSegments = 200;
-var numberOfShades = 4;
+var pathSegmentLength = 3;
+var maxSegments = 100;
+var numberOfShades = 8;
 var lineWidth = 1;
-var alpha = .1;
+var alpha = .05;
 var pathColorScale;
+var curve = d3.curveBundle.beta(.7);
 
 var slices = 2 * (numberOfShades - 1);
 
@@ -244,7 +245,7 @@ function drawContours() {
   // path(contoursGeoData[13]);
   // contourContext.stroke();
 
-  var line = d3.line().context(contourContext).curve(d3.curveBundle.beta(.5));
+  var line = d3.line().context(contourContext).curve(curve);
 
   // paths from random points
 
@@ -471,7 +472,9 @@ function getPath(coords, endEl, contour) {
   var i = 0;
   var avgAspect = 0;
   var next;
-  while (el >= endEl) {
+  var dist = pathSegmentLength * 3;
+  var mindist = 1.5 * pathSegmentLength;
+  while (el >= endEl && dist > mindist) {
     i++;
     index = getIndexForCoordinates(width, Math.round(path[path.length-1][0]), Math.round(path[path.length-1][1]));
     aspect = getAspect(path[path.length-1], index);
@@ -483,6 +486,22 @@ function getPath(coords, endEl, contour) {
     p = polarToCartesian(pathSegmentLength, aspect - halfpi);
     next = [Math.round(path[path.length-1][0] + p.x), Math.round(path[path.length-1][1] + p.y)];
     if (next[0] < 0 || next[0] > width || next[1] < 0 || next[1] > height) break;
+    
+   // if (!allPoints[next[0]] || !allPoints[next[0]][next[1]] || !allPoints[next[0]][next[1]].indexOf(contour) == -1) {
+    path.push(next);
+    if (path.length > 10) {
+      dist = Math.sqrt(Math.pow(path[path.length-1][0] - path[path.length-11][0], 2) + Math.pow(path[path.length-1][1] - path[path.length-11][1], 2));
+      //if (Math.random() > .999) console.log(dist)
+    }
+    //   if (!allPoints[next[0]]) allPoints[next[0]] = {};
+    //   if (!allPoints[next[0]][next[1]]) allPoints[next[0]][next[1]] = [];
+    //   allPoints[next[0]][next[1]].push(contour);
+    // } else {
+    //   break;
+    // }
+  }
+  if (path.length > 1) return {coords: path, aspect: avgAspect/i};
+}
    // if (!allPoints[next[0]] || !allPoints[next[0]][next[1]] || !allPoints[next[0]][next[1]].indexOf(contour) == -1) {
       path.push(next);
     //   if (!allPoints[next[0]]) allPoints[next[0]] = {};
@@ -614,6 +633,88 @@ function getAspect (coords, n) {
 
 
   */
+}
+
+function getAspectAndNext (coords, n, logall) {
+  var x = Math.round(coords[0]);
+  var y = Math.round(coords[1]);
+
+  if (n === undefined) n = getIndexForCoordinates(width,x,y);
+  if (data[n] !== undefined) return data[n];
+
+  var cells = [[], [], []];
+
+  if (x < 10 || x > width - 10 || y < 10 || y > height - 10) return;
+  var min = Infinity;
+  var next;
+  var loggy = Math.random() > .9999;
+  //if (loggy) console.log('----------LOGGIN-------------')
+
+  for (var row = -1; row <= 1; row ++) {
+    for (var col = -1; col <= 1; col++) {
+      if (row == 0 && col == 0) continue;
+      var cx = x + col * cellSize;
+      var cy = y + row * cellSize;
+      var avg = 0;
+      for (var cellX = cx - halfCell; cellX <= cx + halfCell; cellX++) {
+        for (var cellY = cy - halfCell; cellY <= cy +halfCell ; cellY++) {
+         // if (loggy) console.log(cellX -x, cellY-y)
+          var index = getIndexForCoordinates(width, cellX, cellY);
+          var val = elev(index, demData);
+          if (val !== undefined) {
+            avg += val;
+          }
+        }
+      }
+      avg /= squaredCell;
+      cells[row + 1][col + 1] = avg;
+    }
+  }
+  for (var row = -3; row <= 3; row ++) {
+    for (var col = -3; col <= 3; col++) {
+      if (row == col && (Math.abs(col) !== 1) && Math.abs(col) !== 2) continue;
+      var index = getIndexForCoordinates(width, x + col, y + row);
+      var val = elev(index, demData);
+      if (logall) {
+        console.log(min, val, col, row)
+      }
+      if (val < min) {
+        min = val;
+        next = [x + col, y + row];
+      }
+    }
+  }
+
+  if (loggy) {
+    console.log('......next', next[0] - x, next[1] - y)
+  }
+
+  var a = cells[0][0],
+    b = cells[0][1],
+    c = cells[0][2],
+    d = cells[1][0],
+    e = cells[1][1],
+    f = cells[1][2],
+    g = cells[2][0],
+    h = cells[2][1],
+    i = cells[2][2];
+
+  var dx = ((c + 2*f + i) - (a + 2*d + g)) / 8;
+  var dy = ((g + 2*h + i) - (a + 2*b + c)) / 8;
+  var aspect = 57.29578 * Math.atan2 (dy, -dx);
+  if (aspect < 0)
+    aspect = 90.0 - aspect 
+  else if (aspect > 90.0)
+    aspect = 360.0 - aspect + 90.0
+  else
+    aspect = 90.0 - aspect;
+
+  aspect /= 57.29578;
+
+  data[n] = aspect;
+  //if (Math.abs(aspect-270 < .1)) console.log(cells)
+  
+  return [aspect, next];
 }
 
 // convert elevation tile color to elevation value
