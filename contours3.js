@@ -4,10 +4,11 @@ var pathSpacing = 3;
 var pathSegmentLength = 3;
 var maxSegments = 100;
 var numberOfShades = 8;
-var lineWidth = 1;
+var lineWidth = 2;
 var alpha = .05;
 var pathColorScale;
 var curve = d3.curveBundle.beta(.7);
+var composite = 'screen';
 
 var slices = 2 * (numberOfShades - 1);
 
@@ -343,8 +344,9 @@ function drawContours() {
           // contourContext.moveTo(ring[i][0], ring[i][1]);
           // contourContext.lineTo(ring[i][0] + p.x, ring[i][1] + p.y)
           var p;
-          if (c.value > 0 ) p = getPath(ringCoords[i], (c.value - interval)/3.28084, c.value);
-          else p = getPathUp(ringCoords[i], (c.value + interval)/3.28084, c.value);
+          p = getPathUp(ringCoords[i], (c.value + 3 * interval)/3.28084, c.value);
+          // if (c.value > 0 ) p = getPath(ringCoords[i], (c.value - interval)/3.28084, c.value);
+          // else p = getPathUp(ringCoords[i], (c.value + interval)/3.28084, c.value);
           if (p) paths.push(p);
 
           
@@ -370,6 +372,8 @@ function drawContours() {
 
     var slice = pi*2/slices;
     var minLightAngle = 1.75 * pi - (slice/2);
+
+    contourContext.globalCompositeOperation = composite;
    
     var delta;
     var slicesAway;
@@ -502,45 +506,52 @@ function getPath(coords, endEl, contour) {
   }
   if (path.length > 1) return {coords: path, aspect: avgAspect/i};
 }
-   // if (!allPoints[next[0]] || !allPoints[next[0]][next[1]] || !allPoints[next[0]][next[1]].indexOf(contour) == -1) {
-      path.push(next);
-    //   if (!allPoints[next[0]]) allPoints[next[0]] = {};
-    //   if (!allPoints[next[0]][next[1]]) allPoints[next[0]][next[1]] = [];
-    //   allPoints[next[0]][next[1]].push(contour);
-    // } else {
-    //   break;
-    // }
-  }
-  if (path.length > 1) return {coords: path, aspect: avgAspect/i};
-}
+//    // if (!allPoints[next[0]] || !allPoints[next[0]][next[1]] || !allPoints[next[0]][next[1]].indexOf(contour) == -1) {
+//       path.push(next);
+//     //   if (!allPoints[next[0]]) allPoints[next[0]] = {};
+//     //   if (!allPoints[next[0]][next[1]]) allPoints[next[0]][next[1]] = [];
+//     //   allPoints[next[0]][next[1]].push(contour);
+//     // } else {
+//     //   break;
+//     // }
+//   }
+//   if (path.length > 1) return {coords: path, aspect: avgAspect/i};
+// }
 
 function getPathUp(coords, endEl, contour) {
   var path = [coords];
   var index;
   var aspect;
   var el = 0;
-  endEl = 50000;
+  //endEl = 50000;
   var p;
   var i = 0;
   var avgAspect = 0;
   var next;
-  index = getIndexForCoordinates(width, Math.round(path[path.length-1][0]), Math.round(path[path.length-1][1]));
-  aspect = getAspect(path[path.length-1], index);
-  var maxSegs = 3 - Math.round(Math.random());
-  while (el <= endEl && el >= contour) {
+  var dist = pathSegmentLength * 10;
+  var mindist = 2 * pathSegmentLength;
+  var segmentsToMeasure = 3;
+  var nextEl;
+  while (el <= endEl && dist > mindist) {
     i++;
+    if (i > maxSegments) break;
     index = getIndexForCoordinates(width, Math.round(path[path.length-1][0]), Math.round(path[path.length-1][1]));
-    aspect = aspect + (.4 - .8 * Math.random());
-    el = elev(index, demData);
+    aspect = getAspect(path[path.length-1], index);
+    nextEl = elev(index, demData);
     if (isNaN(aspect) || aspect === undefined) break;
-    if (isNaN(el) || !el) break;
-    if (i > maxSegs) break;
+    if (isNaN(nextEl) || !nextEl) break;
+    el = nextEl;
     avgAspect += aspect;
-    p = polarToCartesian(5, aspect - halfpi);
+    p = polarToCartesian(pathSegmentLength, aspect - halfpi);
     next = [Math.round(path[path.length-1][0] - p.x), Math.round(path[path.length-1][1] - p.y)];
     if (next[0] < 0 || next[0] > width || next[1] < 0 || next[1] > height) break;
+    
    // if (!allPoints[next[0]] || !allPoints[next[0]][next[1]] || !allPoints[next[0]][next[1]].indexOf(contour) == -1) {
-      path.push(next);
+    path.push(next);
+    if (path.length > segmentsToMeasure) {
+      dist = Math.sqrt(Math.pow(path[path.length-1][0] - path[path.length-segmentsToMeasure-1][0], 2) + Math.pow(path[path.length-1][1] - path[path.length-segmentsToMeasure-1][1], 2));
+      //if (Math.random() > .999) console.log(dist)
+    }
     //   if (!allPoints[next[0]]) allPoints[next[0]] = {};
     //   if (!allPoints[next[0]][next[1]]) allPoints[next[0]][next[1]] = [];
     //   allPoints[next[0]][next[1]].push(contour);
@@ -548,7 +559,7 @@ function getPathUp(coords, endEl, contour) {
     //   break;
     // }
   }
-  if (path.length > 1) return {coords: path, aspect: avgAspect/i};
+  if (path.length > 3) return {coords: path, aspect: avgAspect/i};
 }
 
 var cellSize = 3;
