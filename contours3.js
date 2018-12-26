@@ -1,11 +1,11 @@
-var forcedInterval = 50;
+var forcedInterval = 250;
 var intervalMutliplier = 1;
-var pathSpacing = 3;
-var pathSegmentLength = 3;
-var maxSegments = 100;
+var pathSpacing = 2;
+var pathSegmentLength = 2;
+var maxSegments = 40;
 var numberOfShades = 8;
 var lineWidth = 1;
-var alpha = .05;
+var alpha = .75;
 var pathColorScale;
 var curve = d3.curveBundle.beta(.7);
 
@@ -128,7 +128,10 @@ var color3 = d3.scaleLinear().domain([0, 180]).range(['#ccc', '#333']);
 var color4 = d3.scaleLinear().domain([0, 180]).range(['#42f4b0', '#234da0']).interpolate(d3.interpolateHcl);
 var color5 = d3.scaleLinear().domain([0, 180]).range(['#ffe083', '#5b81ff']).interpolate(d3.interpolateHcl);
 var color6 = d3.scaleLinear().domain([0, 180]).range(['#ff6083', '#5b81ff']).interpolate(d3.interpolateHcl);
-pathColorScale = color5;
+var color7 = d3.scaleLinear().domain([2, maxSegments + 1]).range(['#999', '#000']);
+var color8 = d3.scaleLinear().domain([0, 180]).range(['#224C57', '#C36762']).interpolate(d3.interpolateHsl);
+
+pathColorScale = color8;
 
 function getRelief(){
   // reset canvases
@@ -197,6 +200,7 @@ function getRelief(){
   }
 
   drawContours();
+  //drawRandom();
 }
 
 var angle = Math.PI / 4;
@@ -208,6 +212,82 @@ var halfpi = Math.PI/2;
     .attr('width', width)
     .attr('height', height)
     .style('display', 'none');
+
+function drawRandom() {
+  var numPaths = 20000;
+  var p, x, y, el;
+  var paths = [];
+  for (var i = 0; i < numPaths; i ++) {
+    x = Math.round(Math.random() * width);
+    y = Math.round(Math.random() * height);
+    if (x < 5 || x > width - 5 || y < 5 || y > height - 5) continue;
+    el = elev(getIndexForCoordinates(width, x, y), demData) * 3.28084;
+    if (el > 0)
+      p = getPath([x,y], 0, el);
+    if (p) paths.push(p);
+
+  }
+  var pathGroups = [];
+  
+  paths.forEach(function (p) {
+   
+    if (!pathGroups[p.coords.length]) pathGroups[p.coords.length] = [];
+    pathGroups[p.coords.length].push(p);
+    
+  });
+
+  var line = d3.line().context(contourContext).curve(curve);
+
+
+  contourContext.lineWidth = 0.5;
+  contourContext.globalAlpha = .01;
+  contourContext.lineCap = 'round';
+  contourContext.lineJoin = 'round';
+  contourContext.globalCompositeOperation = 'multiply';
+
+  pathColorScale.domain([0,numberOfShades-1])
+  //pathColorScale.domain([2,maxSegments+1])
+
+  var strokeScale = d3.scaleLinear().domain([4, maxSegments+1]).range([5, 1]);
+  //var strokeScale = d3.scaleLinear().domain([0, numberOfShades-1]).range([.1, 1]);
+
+  var slice = pi*2/slices;
+  var minLightAngle = 1.75 * pi - (slice/2);
+
+  //console.log(pathGroups)
+
+ // for (var pg = 0; pg < pathGroups.length; pg ++) {
+    //if (!pathGroups[pg]) continue;
+
+    // if (pg == 2) contourContext.strokeStyle = 'black';
+    // else if (pg == 1) contourContext.strokeStyle = '#666';
+    // else contourContext.strokeStyle = '#ccc';
+    // if (pg == 2) contourContext.strokeStyle = 'black';
+    // else if (pg == 1) contourContext.strokeStyle = 'red';
+    // else contourContext.strokeStyle = 'blue';
+    paths.forEach(function (p) {
+      if (p.aspect < 0) p.aspect += pi*2;
+      var delta = p.aspect - minLightAngle;
+      if (delta < 0 ) delta += 2*pi;
+      var slicesAway = Math.ceil(delta/slice);
+      if (slicesAway > numberOfShades) slicesAway = 2 * numberOfShades - slicesAway;
+      slicesAway--;
+
+      // var l = p.coords.length;
+      // contourContext.beginPath();
+      // contourContext.lineWidth = 4;//strokeScale(slicesAway) * 2;
+      // contourContext.strokeStyle = '#fffefa';//pathColorScale(pg);//colors[pg];
+      // line(p.coords);
+      // contourContext.stroke();
+
+      contourContext.beginPath();
+      contourContext.lineWidth = 20 * p.start/max;//strokeScale(slicesAway);
+      contourContext.strokeStyle = pathColorScale(slicesAway);//colors[pg];
+      line(p.coords);
+      contourContext.stroke();
+    })
+  }
+//}
 
 function drawContours() {
   contourContext.clearRect(0,0,width,height);
@@ -308,6 +388,8 @@ function drawContours() {
   // }
 
   // paths from contours
+      var paths = [];
+
   
   for (var j = contoursGeoData.length-1; j > 0; j--) {
    // continue;
@@ -315,7 +397,6 @@ function drawContours() {
       // if (c.value > 0) continue;
 
    // if (c.value !=5000) continue;
-    var paths = [];
 
 
     c.coordinates.forEach(function (poly) {
@@ -356,55 +437,7 @@ function drawContours() {
 
 
 
-    var pathGroups = new Array(numberOfShades);
-    var colors = [];
-    for (var a = 0; a < numberOfShades; a ++) {
-      pathGroups[a] = [];
-      // var v = 204 - a * (204/(numberOfShades-1));
-      // colors.push('rgb(' + [v,v + 15,v + 45].join(',') + ')')
-      var v = 180 - a * (180/(numberOfShades-1));
-      colors.push('rgb(' + [v,v,v].join(',') + ')')
-    }
-    pathColorScale.domain([0,numberOfShades-1])
-    // light, medium, dark
-
-    var slice = pi*2/slices;
-    var minLightAngle = 1.75 * pi - (slice/2);
-   
-    var delta;
-    var slicesAway;
-    paths.forEach(function (p) {
-      if (p.aspect < 0) p.aspect += pi*2;
-      delta = p.aspect - minLightAngle;
-      if (delta < 0 ) delta += 2*pi;
-      slicesAway = Math.ceil(delta/slice);
-      if (slicesAway > numberOfShades) slicesAway = 2 * numberOfShades - slicesAway;
-      slicesAway--;
-     // console.log(slicesAway)
-      pathGroups[slicesAway].push(p);
-      // if (p.aspect > 1.5 * pi) pathGroups[0].push(p);
-      // else if (p.aspect > halfpi && p.aspect < pi) pathGroups[2].push(p);
-      // else pathGroups[1].push(p);
-    });
-
-    //console.log(pathGroups)
-
-    for (var pg = 0; pg < pathGroups.length; pg ++) {
-      if (!pathGroups[pg]) continue;
-      contourContext.beginPath();
-      contourContext.strokeStyle = pathColorScale(pg);//colors[pg];
-      // if (pg == 2) contourContext.strokeStyle = 'black';
-      // else if (pg == 1) contourContext.strokeStyle = '#666';
-      // else contourContext.strokeStyle = '#ccc';
-      // if (pg == 2) contourContext.strokeStyle = 'black';
-      // else if (pg == 1) contourContext.strokeStyle = 'red';
-      // else contourContext.strokeStyle = 'blue';
-      contourContext.lineWidth = lineWidth// + pg / numberOfShades;
-      pathGroups[pg].forEach(function (p) {
-        line(p.coords);
-      })
-      contourContext.stroke();
-    }
+  
 
 
 
@@ -425,6 +458,57 @@ function drawContours() {
     // contourContext.stroke();
     // contourContext.restore();
   }
+
+  var pathGroups = [];
+  
+  // paths.forEach(function (p) {
+   
+  //   if (!pathGroups[p.coords.length]) pathGroups[p.coords.length] = [];
+  //   pathGroups[p.coords.length].push(p);
+    
+  // });
+
+
+  contourContext.lineWidth = 0.5;
+  contourContext.globalAlpha = .05;
+  contourContext.lineCap = 'round';
+  contourContext.lineJoin = 'round';
+  contourContext.globalCompositeOperation = 'color-dodge'
+
+  pathColorScale.domain([0,numberOfShades-1])
+
+  //var strokeScale = d3.scaleLinear().domain([4, maxSegments+1]).range([2, 1]);
+  var strokeScale = d3.scaleLinear().domain([0, numberOfShades-1]).range([.2, 2]);
+
+  var slice = pi*2/slices;
+  var minLightAngle = 1.75 * pi - (slice/2);
+
+  //console.log(pathGroups)
+d3.shuffle(paths)
+  
+    paths.forEach(function (p) {
+      if (p.aspect < 0) p.aspect += pi*2;
+      var delta = p.aspect - minLightAngle;
+      if (delta < 0 ) delta += 2*pi;
+      var slicesAway = Math.ceil(delta/slice);
+      if (slicesAway > numberOfShades) slicesAway = 2 * numberOfShades - slicesAway;
+      slicesAway--;
+
+      // var l = p.coords.length;
+      // contourContext.beginPath();
+      // contourContext.lineWidth = 40/p.coords.length;//strokeScale(l) * 5;
+      // contourContext.strokeStyle = '#fffefa';//pathColorScale(pg);//colors[pg];
+      // line(p.coords);
+      // contourContext.stroke();
+
+      if (Math.random() > .999) console.log(slicesAway, pathColorScale(slicesAway))
+
+      contourContext.beginPath();
+      contourContext.lineWidth = 20 * p.start/max;//strokeScale(slicesAway);
+      contourContext.strokeStyle = pathColorScale(slicesAway);//colors[pg];
+      line(p.coords);
+      contourContext.stroke();
+    })
 
   contoursGeoData.forEach(function (c){
     return;
@@ -467,18 +551,19 @@ function getPath(coords, endEl, contour) {
   var index;
   var aspect;
   var el = 50000;
-  endEl = 0;
+  endEl = 0;//contour - interval;
+  //console.log(contour,endEl)
   var p;
   var i = 0;
   var avgAspect = 0;
   var next;
   var dist = pathSegmentLength * 3;
-  var mindist = 1.5 * pathSegmentLength;
+  var mindist = 0;//1.5 * pathSegmentLength;
   while (el >= endEl && dist > mindist) {
     i++;
     index = getIndexForCoordinates(width, Math.round(path[path.length-1][0]), Math.round(path[path.length-1][1]));
     aspect = getAspect(path[path.length-1], index);
-    el = elev(index, demData);
+    el = elev(index, demData) * 3.28084;
     if (isNaN(aspect) || aspect === undefined) break;
     if (isNaN(el) || !el) break;
     if (i > maxSegments) break;
@@ -500,19 +585,19 @@ function getPath(coords, endEl, contour) {
     //   break;
     // }
   }
-  if (path.length > 1) return {coords: path, aspect: avgAspect/i};
+  if (path.length > 1) return {start: contour, coords: path, aspect: avgAspect/i};
 }
-   // if (!allPoints[next[0]] || !allPoints[next[0]][next[1]] || !allPoints[next[0]][next[1]].indexOf(contour) == -1) {
-      path.push(next);
-    //   if (!allPoints[next[0]]) allPoints[next[0]] = {};
-    //   if (!allPoints[next[0]][next[1]]) allPoints[next[0]][next[1]] = [];
-    //   allPoints[next[0]][next[1]].push(contour);
-    // } else {
-    //   break;
-    // }
-  }
-  if (path.length > 1) return {coords: path, aspect: avgAspect/i};
-}
+//    // if (!allPoints[next[0]] || !allPoints[next[0]][next[1]] || !allPoints[next[0]][next[1]].indexOf(contour) == -1) {
+//       path.push(next);
+//     //   if (!allPoints[next[0]]) allPoints[next[0]] = {};
+//     //   if (!allPoints[next[0]][next[1]]) allPoints[next[0]][next[1]] = [];
+//     //   allPoints[next[0]][next[1]].push(contour);
+//     // } else {
+//     //   break;
+//     // }
+//   }
+//   if (path.length > 1) return {coords: path, aspect: avgAspect/i};
+// }
 
 function getPathUp(coords, endEl, contour) {
   var path = [coords];
