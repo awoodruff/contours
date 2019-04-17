@@ -1,14 +1,16 @@
-var forcedInterval = 50;
+var forcedInterval = 100;
 var intervalMutliplier = 1;
-var pathSpacing = 3;
-var pathSegmentLength = 3;
+var pathSpacing = 1;
+var pathSegmentLength = 5;
 var maxSegments = 100;
 var numberOfShades = 8;
 var lineWidth = 2;
-var alpha = .05;
+var alpha = .025;
 var pathColorScale;
 var curve = d3.curveBundle.beta(.7);
-var composite = 'screen';
+var composite = 'overlay';
+var maxContoursTraveled = 100;
+var imageScale = 1;
 
 var slices = 2 * (numberOfShades - 1);
 
@@ -32,8 +34,8 @@ var demContext = demCanvas.getContext('2d');
 // not too big or this can get hella slow
 var width = window.innerWidth;
 var height = window.innerHeight;
-contourCanvas.width = width;
-contourCanvas.height = height;
+contourCanvas.width = width * imageScale;
+contourCanvas.height = height * imageScale;
 demCanvas.width = width;
 demCanvas.height = height;
 document.getElementById('map').style.width = width + 'px';
@@ -79,7 +81,7 @@ L.control.zoom({position:'bottomright'}).addTo(map);
 map.on('moveend', function() {
   // on move end we redraw the flow layer, so clear some stuff
  
-  contourContext.clearRect(0,0,width,height);
+  contourContext.clearRect(0,0,width * imageScale,height * imageScale);
   clearTimeout(wait);
   wait = setTimeout(getRelief,500);  // redraw after a delay in case map is moved again soon after
 });
@@ -125,15 +127,17 @@ var color = d3.scaleLinear()
   .interpolate(d3.interpolateHcl);
 
 var color2 = d3.scaleLinear().domain([0, 180]).range(['#ffe083', '#0c6eb9']).interpolate(d3.interpolateHcl);
-var color3 = d3.scaleLinear().domain([0, 180]).range(['#ccc', '#333']);
+var color3 = d3.scaleLinear().domain([0, 180]).range(['#fff', '#000']);
 var color4 = d3.scaleLinear().domain([0, 180]).range(['#42f4b0', '#234da0']).interpolate(d3.interpolateHcl);
 var color5 = d3.scaleLinear().domain([0, 180]).range(['#ffe083', '#5b81ff']).interpolate(d3.interpolateHcl);
 var color6 = d3.scaleLinear().domain([0, 180]).range(['#ff6083', '#5b81ff']).interpolate(d3.interpolateHcl);
-pathColorScale = color5;
+var color7 = d3.scaleLinear().domain([0, 180]).range(['#ffeb00', '##006195']).interpolate(d3.interpolateHclLong);
+var color8 = d3.scaleLinear().domain([0, 100, 180]).range(['#ffde00', '#cd74aa', '#0048e4']).interpolate(d3.interpolateRgb.gamma(.5));
+pathColorScale = color3;
 
 function getRelief(){
   // reset canvases
-  contourContext.clearRect(0,0,width,height);
+  contourContext.clearRect(0,0,width * imageScale,height * imageScale);
   demContext.clearRect(0,0,width,height);
   reverseTransform();
 
@@ -211,7 +215,7 @@ var halfpi = Math.PI/2;
     .style('display', 'none');
 
 function drawContours() {
-  contourContext.clearRect(0,0,width,height);
+  contourContext.clearRect(0,0,width * imageScale,height * imageScale);
   svg.selectAll('path').remove();
 
   // var zero = contoursGeoData.filter(function (c){ return c.value === 0});
@@ -237,7 +241,7 @@ function drawContours() {
   allPoints = {};
 
   
-  contourContext.lineWidth = 0.5;
+  contourContext.lineWidth = 0.5 * imageScale;
   contourContext.globalAlpha = alpha;
 
   // contourContext.beginPath();
@@ -344,7 +348,7 @@ function drawContours() {
           // contourContext.moveTo(ring[i][0], ring[i][1]);
           // contourContext.lineTo(ring[i][0] + p.x, ring[i][1] + p.y)
           var p;
-          p = getPathUp(ringCoords[i], (c.value + 3 * interval)/3.28084, c.value);
+          p = getPathUp(ringCoords[i], (c.value + maxContoursTraveled * interval)/3.28084, c.value);
           // if (c.value > 0 ) p = getPath(ringCoords[i], (c.value - interval)/3.28084, c.value);
           // else p = getPathUp(ringCoords[i], (c.value + interval)/3.28084, c.value);
           if (p) paths.push(p);
@@ -367,23 +371,29 @@ function drawContours() {
       var v = 180 - a * (180/(numberOfShades-1));
       colors.push('rgb(' + [v,v,v].join(',') + ')')
     }
-    pathColorScale.domain([0,numberOfShades-1])
+    if (pathColorScale.range().length === 3)
+      pathColorScale.domain([0,(numberOfShades-1)/2,numberOfShades-1])
+    else
+      pathColorScale.domain([0,numberOfShades-1])
     // light, medium, dark
 
     var slice = pi*2/slices;
-    var minLightAngle = 1.75 * pi - (slice/2);
+    var minLightAngle = 1.75 * pi;
 
     contourContext.globalCompositeOperation = composite;
+    contourContext.lineCap = 'round';
+    contourContext.lineJoin = 'round';
    
     var delta;
     var slicesAway;
     paths.forEach(function (p) {
       if (p.aspect < 0) p.aspect += pi*2;
-      delta = p.aspect - minLightAngle;
-      if (delta < 0 ) delta += 2*pi;
-      slicesAway = Math.ceil(delta/slice);
+      delta = Math.abs(p.aspect - minLightAngle);
+      if (delta > pi) delta = 2*pi - delta;
+      slicesAway = Math.round(delta/slice);
+      
       if (slicesAway > numberOfShades) slicesAway = 2 * numberOfShades - slicesAway;
-      slicesAway--;
+      //slicesAway--;
      // console.log(slicesAway)
       pathGroups[slicesAway].push(p);
       // if (p.aspect > 1.5 * pi) pathGroups[0].push(p);
@@ -393,7 +403,7 @@ function drawContours() {
 
     //console.log(pathGroups)
 
-    for (var pg = 0; pg < pathGroups.length; pg ++) {
+    for (var pg = pathGroups.length - 1; pg >= 0; pg --) {
       if (!pathGroups[pg]) continue;
       contourContext.beginPath();
       contourContext.strokeStyle = pathColorScale(pg);//colors[pg];
@@ -403,9 +413,12 @@ function drawContours() {
       // if (pg == 2) contourContext.strokeStyle = 'black';
       // else if (pg == 1) contourContext.strokeStyle = 'red';
       // else contourContext.strokeStyle = 'blue';
-      contourContext.lineWidth = lineWidth// + pg / numberOfShades;
+      contourContext.lineWidth = lineWidth * imageScale// + pg / numberOfShades;
       pathGroups[pg].forEach(function (p) {
-        line(p.coords);
+        var coords = p.coords.map(function (c) {
+          return [c[0] * imageScale, c[1] * imageScale];
+        })
+        line(coords);
       })
       contourContext.stroke();
     }
@@ -538,6 +551,7 @@ function getPathUp(coords, endEl, contour) {
     index = getIndexForCoordinates(width, Math.round(path[path.length-1][0]), Math.round(path[path.length-1][1]));
     aspect = getAspect(path[path.length-1], index);
     nextEl = elev(index, demData);
+    if (nextEl == el) break;
     if (isNaN(aspect) || aspect === undefined) break;
     if (isNaN(nextEl) || !nextEl) break;
     el = nextEl;
